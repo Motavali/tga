@@ -3,38 +3,81 @@ import json
 import requests
 from bs4 import BeautifulSoup
 
-# نام کانال عمومی را اینجا وارد کنید (بدون @)
-# مثال: 'bbcPersian'
-CHANNEL_USERNAME = 'HATTRICK_CHANNEL' 
+# لینک مستقیم پست تلگرام را اینجا وارد کنید
+# مثال: 'https://t.me/s/HATTRICK_CHANNEL/24608'
+POST_URL = 'https://t.me/s/HATTRICK_CHANNEL/24608'
 
-def get_posts():
-    url = f"https://t.me/s/{CHANNEL_USERNAME}"
-    print(f"Trying to fetch: {url}")
+def get_post_data(url):
+    print(f"Fetching data from: {url}")
     
     try:
-        # درخواست به تلگرام
-        response = requests.get(url, timeout=10)
-        print(f"Response Status Code: {response.status_code}")
+        # تنظیم هدر برای شبیه‌سازی مرورگر
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        }
         
-        if response.status_code != 200:
-            print(f"Error: Failed to fetch page. Status code: {response.status_code}")
-            return []
-
+        # درخواست به صفحه پست
+        response = requests.get(url, headers=headers, timeout=10)
+        response.raise_for_status()
+        
         # تحلیل HTML
         soup = BeautifulSoup(response.text, 'html.parser')
         
-        # پیدا کردن پست‌ها
-        # ساختار HTML تلگرام ممکن است تغییر کند، اما معمولاً کلاس 'tgme_channel_history_post' ثابت است
-        posts = soup.find_all('div', class_='tgme_channel_history_post')
+        # استخراج متن پست
+        # متن پست معمولاً در div با کلاس 'tgme_post_message' است
+        message_div = soup.find('div', class_='tgme_post_message')
         
-        print(f"Found {len(posts)} posts in HTML.")
+        if message_div:
+            # حذف تگ‌های HTML و دریافت متن خالص
+            text = message_div.get_text(separator=' ', strip=True)
+            
+            # استخراج تاریخ
+            # تاریخ معمولاً در لینک <a> با کلاس 'tgme_post_time' است
+            time_tag = soup.find('a', class_='tgme_post_time')
+            date_str = time_tag['title'] if time_tag else 'Unknown Date'
+            
+            # استخراج لینک پست (همان لینک ورودی)
+            post_link = url
+            
+            # استخراج شناسه پست از URL
+            # فرمت URL: https://t.me/s/channel/post_id
+            post_id = url.strip('/').split('/')[-1]
+            
+            return {
+                "id": post_id,
+                "text": text,
+                "date": date_str,
+                "link": post_link
+            }
+        else:
+            print("Error: Could not find the post message div.")
+            return None
+            
+    except Exception as e:
+        print(f"Error fetching post: {e}")
+        return None
+
+def main():
+    print("Starting Telegram Post Scraper...")
+    
+    # دریافت اطلاعات پست
+    post_data = get_post_data(POST_URL)
+    
+    if post_data:
+        # ذخیره در فایل JSON
+        # اگر می‌خواهید لیستی از پست‌ها داشته باشید، می‌توانید این دیکشنری را در یک لیست قرار دهید
+        posts_list = [post_data]
         
-        result = []
-        # پردازش ۵ پست اول
-        for post in posts[:5]:
-            # استخراج متن
-            message_div = post.find('div', class_='tgme_post_message')
-            if message_div:
+        with open('posts.json', 'w', encoding='utf-8') as f:
+            json.dump(posts_list, f, ensure_ascii=False, indent=4)
+            
+        print(f"Success! Post ID {post_data['id']} saved to posts.json")
+        print(f"Text preview: {post_data['text'][:50]}...")
+    else:
+        print("Failed to fetch post data.")
+
+if __name__ == '__main__':
+    main()            if message_div:
                 text = message_div.get_text(separator=' ', strip=True)
                 
                 # استخراج تاریخ
