@@ -26,11 +26,24 @@ jobs:
         run: |
           python telegram_bot.py
 
-      - name: Commit and Push
+      - name: Commit and push changes
         if: success()
         run: |
+          # 1. تنظیم هویت
           git config --global user.name '${{ github.actor }}'
-          git config --global user.email '${{ github.actor}}@users.noreply.github.com'
+          git config --global user.email '${{ github.actor }}@users.noreply.github.com'
+          
+          # 2. اطمینان از اینکه روی شاخه صحیح هستیم (هر دو حالت main و master را چک می‌کند)
+          git checkout main || git checkout master
+          
+          # 3. اضافه کردن فایل‌ها
           git add posts.json
-          git diff --cached --quiet || git commit -m "Update posts from Telegram"
-          git push
+          
+          # 4. فقط اگر تغییری وجود دارد، کامیت کن
+          # دستور --quiet باعث می‌شود اگر تغییری نبود، خروجی ندهد و خطا ندهد
+          git diff --cached --quiet || git commit -m "Update Telegram posts [skip ci]"
+          
+          # 5. پش دادن
+          # این دستور اگر شاخه اصلی main باشد آن را پش می‌دهد، اگر نبود master را
+          # اگر شاخه‌ای که روی آن هستید خالی باشد یا تغییر کرده باشد، پش می‌دهد
+          git push origin main || git push origin master
