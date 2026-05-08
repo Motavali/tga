@@ -1,73 +1,75 @@
 import os
 import json
-import re
 import requests
 from bs4 import BeautifulSoup
 
-# نام کاربری کانال عمومی را اینجا وارد کنید (بدون @)
-CHANNEL_USERNAME = 'hattrick_channel'  # مثال: bbcPersian, CNN
+# نام کانال عمومی را اینجا وارد کنید (بدون @)
+# مثال: 'bbcPersian'
+CHANNEL_USERNAME = 'HATTRICK_CHANNEL' 
 
-def get_posts_from_public_channel(username):
-    url = f"https://t.me/s/{username}"
+def get_posts():
+    url = f"https://t.me/s/{CHANNEL_USERNAME}"
+    print(f"Trying to fetch: {url}")
     
     try:
-        # ارسال درخواست به صفحه کانال
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-        }
-        response = requests.get(url, headers=headers)
-        response.raise_for_status()
+        # درخواست به تلگرام
+        response = requests.get(url, timeout=10)
+        print(f"Response Status Code: {response.status_code}")
         
+        if response.status_code != 200:
+            print(f"Error: Failed to fetch page. Status code: {response.status_code}")
+            return []
+
         # تحلیل HTML
         soup = BeautifulSoup(response.text, 'html.parser')
         
-        # پیدا کردن تمام پست‌ها
-        # ساختار HTML تلگرام برای پست‌ها معمولاً در divهای با کلاس 'tgme_channel_history_post' است
-        posts_divs = soup.find_all('div', class_='tgme_channel_history_post')
+        # پیدا کردن پست‌ها
+        # ساختار HTML تلگرام ممکن است تغییر کند، اما معمولاً کلاس 'tgme_channel_history_post' ثابت است
+        posts = soup.find_all('div', class_='tgme_channel_history_post')
         
-        posts = []
+        print(f"Found {len(posts)} posts in HTML.")
         
-        # حلقه روی پست‌ها (فقط ۵ پست اول)
-        for i, post in enumerate(posts_divs[:5]):
+        result = []
+        # پردازش ۵ پست اول
+        for post in posts[:5]:
             # استخراج متن
-            # متن اصلی معمولاً در div با کلاس 'tgme_post_message' است
             message_div = post.find('div', class_='tgme_post_message')
             if message_div:
-                # حذف تگ‌های HTML از متن (مثل <br>، <a> و ...)
                 text = message_div.get_text(separator=' ', strip=True)
                 
                 # استخراج تاریخ
-                # تاریخ معمولاً در لینک <a> داخل پست است
                 time_tag = post.find('a', class_='tgme_post_time')
-                date_str = time_tag['title'] if time_tag else 'Unknown'
+                date_str = time_tag['title'] if time_tag else 'N/A'
                 
-                # استخراج لینک پست
-                post_link = f"https://t.me/{username}/{post['data-post-id']}" if 'data-post-id' in post.attrs else '#'
+                # استخراج لینک
+                post_id = post.get('data-post-id', 'N/A')
+                link = f"https://t.me/{CHANNEL_USERNAME}/{post_id}" if post_id != 'N/A' else '#'
                 
-                posts.append({
-                    "id": post.get('data-post-id', 'N/A'),
+                result.append({
+                    "id": post_id,
                     "text": text,
                     "date": date_str,
-                    "link": post_link
+                    "link": link
                 })
+            else:
+                print("Skipping post: No message div found.")
         
-        return posts
-    
+        return result
+
     except Exception as e:
-        print(f"Error fetching posts: {e}")
+        print(f"Critical Error: {e}")
         return []
 
 def main():
-    print(f"Fetching posts from @{CHANNEL_USERNAME}...")
-    posts = get_posts_from_public_channel(CHANNEL_USERNAME)
+    print("Starting script...")
+    posts = get_posts()
     
     if posts:
-        # ذخیره در فایل JSON
         with open('posts.json', 'w', encoding='utf-8') as f:
             json.dump(posts, f, ensure_ascii=False, indent=4)
-        print(f"Success! {len(posts)} posts saved to posts.json")
+        print(f"Saved {len(posts)} posts to posts.json")
     else:
-        print("No posts found or error occurred.")
+        print("No posts saved.")
 
 if __name__ == '__main__':
     main()
